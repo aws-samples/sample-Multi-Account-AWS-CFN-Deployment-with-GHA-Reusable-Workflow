@@ -1,0 +1,42 @@
+name: Deploy S3 bucket
+
+permissions:
+  contents: read
+  id-token: write
+on:
+  push:
+    branches:
+      - test
+      - development
+    paths:
+      - 'cloudformation/s3.yml'
+      - '.github/workflows/main-workflow.yml'
+      - '.github/workflows/cft-reuseable-workflow.yml'
+    tags:
+      - 'v1.*'
+  workflow_dispatch:
+jobs:
+  validate-tag:
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4.1.7
+      with:
+        fetch-depth: 0
+    - name: Verify tag is from main branch
+      run: |
+        TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref_name }})
+        MAIN_COMMIT=$(git rev-parse origin/main)
+        if [ "$TAG_COMMIT" != "$MAIN_COMMIT" ]; then
+          echo "Error: Tag ${{ github.ref_name }} was not created from main branch"
+          exit 1
+        fi
+
+  deploy-s3:
+    needs: [validate-tag]
+    if: ${{ always() && (github.ref_type != 'tag' || needs.validate-tag.result == 'success') }}
+    uses: ./.github/workflows/cft-reuseable-workflow.yml
+    with:
+      stack_identifier: s3-stack
+      template_path: cloudformation/s3.yml
+    secrets: inherit

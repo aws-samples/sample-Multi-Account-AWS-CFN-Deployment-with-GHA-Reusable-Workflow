@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 Bucket with encryption and versioning'
+
+Parameters:
+  Environment:
+    Type: String
+  Project:
+    Type: String
+  BucketName:
+    Type: String
+    Description: Name of the S3 bucket
+
+Resources:
+  LoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Environment}-${Project}-${BucketName}-logging-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${Project}-s3-logging-bucket'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Environment}-${Project}-${BucketName}-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: access-logs/
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${Project}-s3-bucket'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+  LoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LoggingBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "RestrictToTLSRequestsOnly"
+            Action: "s3:*"
+            Effect: "Deny"
+            Resource:
+              - !Sub "arn:aws:s3:::${LoggingBucket}"
+              - !Sub "arn:aws:s3:::${LoggingBucket}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
+            Principal: "*"
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "RestrictToTLSRequestsOnly"
+            Action: "s3:*"
+            Effect: "Deny"
+            Resource:
+              - !Sub "arn:aws:s3:::${S3Bucket}"
+              - !Sub "arn:aws:s3:::${S3Bucket}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
+            Principal: "*"
+
+
+
+  BucketNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${Environment}/${Project}/s3/bucket-name"
+      Type: String
+      Value: !Ref S3Bucket
+      Description: S3 Bucket Name
+      Tags:
+        Name: !Sub ${Environment}-${Project}-${AWS::AccountId}-${AWS::Region}-SSM-s3-bucket-name
+        Purpose: SSM parameter to store the S3 bucket name
+
+  LoggingBucketNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${Environment}/${Project}/s3/logging-bucket-name"
+      Type: String
+      Value: !Ref LoggingBucket
+      Description: S3 Logging Bucket Name
+      Tags:
+        Name: !Sub ${Environment}-${Project}-${AWS::AccountId}-${AWS::Region}-SSM-s3-logging-bucket-name
+        Purpose: SSM parameter to store the S3 logging bucket name
+
+Outputs:
+  BucketName:
+    Description: Name of the S3 Bucket
+    Value: !Ref S3Bucket
+    Export:
+      Name: !Sub "${Environment}-${Project}-S3BucketName"
+
+  BucketArn:
+    Description: ARN of the S3 Bucket
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: !Sub "${Environment}-${Project}-S3BucketArn"
+
+  LoggingBucketName:
+    Description: Name of the S3 Logging Bucket
+    Value: !Ref LoggingBucket
+    Export:
+      Name: !Sub "${Environment}-${Project}-S3LoggingBucketName"
+
+  LoggingBucketArn:
+    Description: ARN of the S3 Logging Bucket
+    Value: !GetAtt LoggingBucket.Arn
+    Export:
+      Name: !Sub "${Environment}-${Project}-S3LoggingBucketArn"

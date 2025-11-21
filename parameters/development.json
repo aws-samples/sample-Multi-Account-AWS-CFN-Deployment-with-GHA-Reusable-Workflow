@@ -1,0 +1,8 @@
+{
+    "Parameters": 
+    {   
+        "Environment": "development",
+        "Project": "blog",
+        "BucketName": "s3"
+    }
+}
