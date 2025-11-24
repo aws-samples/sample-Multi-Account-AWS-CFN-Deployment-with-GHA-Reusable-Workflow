@@ -27,7 +27,7 @@ A GitHub Actions reusable workflow for deploying AWS CloudFormation templates ac
 
 ## Architecture Diagram
 
-![architecture diagram](architecture-diagram_v_1.jpg)
+![architecture diagram](architecture-diagram.jpg)
 
 ## GitHub Actions Pipeline Flow
 
